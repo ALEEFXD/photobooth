@@ -1,0 +1,7 @@
+{
+  "activeFolder": "aisyah",
+  "captureDelay": 8,
+  "captureMode": "timer",
+  "outputRoot": "./output",
+  "preferredCamera": "auto"
+}

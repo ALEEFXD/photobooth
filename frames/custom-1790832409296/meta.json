@@ -1,0 +1,32 @@
+{
+  "id": "custom-1790832409296",
+  "name": "Custom Frame",
+  "width": 600,
+  "height": 1800,
+  "printWidth": "4in",
+  "printHeight": "6in",
+  "slots": [
+    {
+      "id": "slot-1",
+      "x": 150,
+      "y": 1650,
+      "width": 925,
+      "height": 1850
+    },
+    {
+      "id": "slot-2",
+      "x": 150,
+      "y": 3650,
+      "width": 925,
+      "height": 1850
+    },
+    {
+      "id": "slot-3",
+      "x": 150,
+      "y": 5600,
+      "width": 925,
+      "height": 1850
+    }
+  ],
+  "custom": true
+}

@@ -1,0 +1,18 @@
+{
+  "id": "single-portrait",
+  "name": "SINGLE PORTRAIT",
+  "width": 1200,
+  "height": 1800,
+  "printWidth": "4in",
+  "printHeight": "6in",
+  "slots": [
+    {
+      "id": "slot-1",
+      "x": 60,
+      "y": 60,
+      "width": 1080,
+      "height": 1680
+    }
+  ],
+  "custom": false
+}

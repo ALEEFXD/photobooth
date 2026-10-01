@@ -1,0 +1,40 @@
+/* ============================================================
+   Print Stylesheet — sized to the photo strip
+   Only the composed result (#print-target) is printed.
+   ============================================================ */
+
+@media print {
+  @page {
+    size: 4in 6in;
+    margin: 0;
+  }
+
+  /* Hide everything */
+  body * {
+    visibility: hidden !important;
+  }
+
+  /* Show only the print target */
+  #print-target,
+  #print-target * {
+    visibility: visible !important;
+  }
+
+  #print-target {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 4in;
+    height: 6in;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  #print-target img,
+  #print-target canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}

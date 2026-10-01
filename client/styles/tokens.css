@@ -1,0 +1,54 @@
+/* ============================================================
+   RawBlock Design Tokens — CSS Custom Properties
+   Strict adherence to rawblock-DESIGN.md
+   ============================================================ */
+
+:root {
+  /* ── Colors ── */
+  --color-black: #000000;
+  --color-white: #FFFFFF;
+  --color-blue: #0000FF;
+  --color-success: #008000;
+  --color-warning: #FFA500;
+  --color-error: #FF0000;
+  --color-info: #0000FF;
+
+  --surface-base: #FFFFFF;
+  --surface-inverted: #000000;
+  --surface-sunken: #F0F0F0;
+
+  --content-primary: #000000;
+  --content-secondary: #555555;
+  --content-tertiary: #999999;
+  --content-inverse: #FFFFFF;
+
+  --border-default: #000000;
+  --border-disabled: #CCCCCC;
+
+  --disabled-fill: #E0E0E0;
+
+  /* ── Typography ── */
+  --font-headline: 'Archivo Black', sans-serif;
+  --font-body: 'Work Sans', sans-serif;
+  --font-mono: 'Space Mono', monospace;
+
+  /* ── Spacing ── */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 16px;
+  --sp-4: 24px;
+  --sp-5: 40px;
+  --sp-6: 64px;
+  --sp-7: 80px;
+  --sp-8: 120px;
+
+  /* ── Borders ── */
+  --border-thin: 1px solid var(--color-black);
+  --border-thick: 3px solid var(--color-black);
+  --border-heavy: 5px solid var(--color-black);
+  --border-disabled-style: 3px solid var(--border-disabled);
+
+  /* ── Radius ── */
+  --radius-none: 0px;
+  --radius-circle: 50%;
+}

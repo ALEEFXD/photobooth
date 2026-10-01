@@ -1,0 +1,39 @@
+{
+  "id": "2x2-grid",
+  "name": "2×2 GRID",
+  "width": 1200,
+  "height": 1800,
+  "printWidth": "4in",
+  "printHeight": "6in",
+  "slots": [
+    {
+      "id": "slot-1",
+      "x": 50,
+      "y": 300,
+      "width": 530,
+      "height": 530
+    },
+    {
+      "id": "slot-2",
+      "x": 620,
+      "y": 300,
+      "width": 530,
+      "height": 530
+    },
+    {
+      "id": "slot-3",
+      "x": 50,
+      "y": 870,
+      "width": 530,
+      "height": 530
+    },
+    {
+      "id": "slot-4",
+      "x": 620,
+      "y": 870,
+      "width": 530,
+      "height": 530
+    }
+  ],
+  "custom": false
+}

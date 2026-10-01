@@ -1,0 +1,39 @@
+{
+  "id": "classic-strip",
+  "name": "CLASSIC STRIP",
+  "width": 1200,
+  "height": 1800,
+  "printWidth": "4in",
+  "printHeight": "6in",
+  "slots": [
+    {
+      "id": "slot-1",
+      "x": 50,
+      "y": 56,
+      "width": 1100,
+      "height": 380
+    },
+    {
+      "id": "slot-2",
+      "x": 50,
+      "y": 492,
+      "width": 1100,
+      "height": 380
+    },
+    {
+      "id": "slot-3",
+      "x": 50,
+      "y": 928,
+      "width": 1100,
+      "height": 380
+    },
+    {
+      "id": "slot-4",
+      "x": 50,
+      "y": 1364,
+      "width": 1100,
+      "height": 380
+    }
+  ],
+  "custom": false
+}
