@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../context/SessionContext';
 import { compositeFrame } from '../canvas/compositor';
+import { usePhotoImages } from '../hooks/usePhotoImages';
 import Button from '../components/Button';
 import Icon from '../components/Icon';
 
@@ -11,7 +12,7 @@ export default function ResultPage() {
   const canvasRef = useRef(null);
   const frameImgRef = useRef(null);
   const [frameLoaded, setFrameLoaded] = useState(false);
-  const [photoImages, setPhotoImages] = useState({});
+  const photoImages = usePhotoImages(photos);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState(null);
@@ -24,22 +25,11 @@ export default function ResultPage() {
     img.src = frame.imageSrc;
   }, [frame, navigate]);
 
-  // Load photo images
-  useEffect(() => {
-    for (const photo of photos) {
-      if (!photoImages[photo.slotId] && photo.imageUrl) {
-        const img = new Image();
-        img.onload = () => setPhotoImages((prev) => ({ ...prev, [photo.slotId]: img }));
-        img.src = photo.imageUrl;
-      }
-    }
-  }, [photos]);
-
   // Draw final composite
   useEffect(() => {
     if (!frameLoaded || !canvasRef.current || !frameImgRef.current) return;
     const photoList = photos.map((p) => ({
-      slotId: p.slotId, image: photoImages[p.slotId] || null,
+      slotId: p.slotId, image: photoImages[p.imageUrl] || null,
       transform: p.transform, adjustments: p.adjustments,
     }));
     compositeFrame(canvasRef.current, frameImgRef.current, frame.slots, photoList);

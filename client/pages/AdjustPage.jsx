@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '../context/SessionContext';
 import { compositeFrame, drawSlotPreview } from '../canvas/compositor';
+import { usePhotoImages } from '../hooks/usePhotoImages';
 import Button from '../components/Button';
 import Icon from '../components/Icon';
 import Modal from '../components/Modal';
@@ -9,13 +10,13 @@ import Modal from '../components/Modal';
 export default function AdjustPage() {
   const navigate = useNavigate();
   const {
-    frame, photos, updateTransform, updateAdjustments,
-    removePhoto, setPhoto, setFrame,
+    frame, photos, overflowPhotos, updateTransform, updateAdjustments,
+    removePhoto, setPhoto, swapFrame,
   } = useSession();
   const canvasRef = useRef(null);
   const frameImgRef = useRef(null);
   const [frameLoaded, setFrameLoaded] = useState(false);
-  const [photoImages, setPhotoImages] = useState({});
+  const photoImages = usePhotoImages(photos);
   const [selectedSlot, setSelectedSlot] = useState(null);
   const [showFrameSwap, setShowFrameSwap] = useState(false);
   const [availableFrames, setAvailableFrames] = useState([]);
@@ -29,22 +30,11 @@ export default function AdjustPage() {
     img.src = frame.imageSrc;
   }, [frame, navigate]);
 
-  // Load photo images
-  useEffect(() => {
-    for (const photo of photos) {
-      if (!photoImages[photo.slotId] && photo.imageUrl) {
-        const img = new Image();
-        img.onload = () => setPhotoImages((prev) => ({ ...prev, [photo.slotId]: img }));
-        img.src = photo.imageUrl;
-      }
-    }
-  }, [photos]);
-
   // Draw main preview
   useEffect(() => {
     if (!frameLoaded || !canvasRef.current || !frameImgRef.current) return;
     const photoList = photos.map((p) => ({
-      slotId: p.slotId, image: photoImages[p.slotId] || null,
+      slotId: p.slotId, image: photoImages[p.imageUrl] || null,
       transform: p.transform, adjustments: p.adjustments,
     }));
     compositeFrame(canvasRef.current, frameImgRef.current, frame.slots, photoList);
@@ -56,11 +46,15 @@ export default function AdjustPage() {
     const photo = photos.find((p) => p.slotId === selectedSlot);
     const slot = frame?.slots.find((s) => s.id === selectedSlot);
     if (!photo || !slot) return;
-    drawSlotPreview(slotCanvasRef.current, photoImages[selectedSlot], slot, photo.transform, photo.adjustments);
+    drawSlotPreview(slotCanvasRef.current, photoImages[photo.imageUrl], slot, photo.transform, photo.adjustments);
   }, [selectedSlot, photos, photoImages, frame]);
 
   const selectedPhoto = photos.find((p) => p.slotId === selectedSlot);
   const selectedSlotDef = frame?.slots.find((s) => s.id === selectedSlot);
+
+  // Count empty slots
+  const filledSlotIds = photos.map((p) => p.slotId);
+  const emptySlotCount = frame ? frame.slots.filter((s) => !filledSlotIds.includes(s.id)).length : 0;
 
   const handleRetake = () => {
     if (!selectedSlot) return;
@@ -86,13 +80,9 @@ export default function AdjustPage() {
   };
 
   const selectNewFrame = (newFrame) => {
-    setFrame({ ...newFrame, imageSrc: `/api/frames/${newFrame.id}/image` });
+    swapFrame({ ...newFrame, imageSrc: `/api/frames/${newFrame.id}/image` });
     setShowFrameSwap(false);
-    // Force reload frame image
-    setFrameLoaded(false);
-    const img = new Image();
-    img.onload = () => { frameImgRef.current = img; setFrameLoaded(true); };
-    img.src = `/api/frames/${newFrame.id}/image`;
+    setSelectedSlot(null);
   };
 
   if (!frame) return null;
@@ -118,6 +108,39 @@ export default function AdjustPage() {
           <div style={{ border: '5px solid var(--color-black)', background: '#F0F0F0' }}>
             <canvas ref={canvasRef} style={{ width: '100%', height: 'auto', display: 'block' }} />
           </div>
+
+          {/* Swap notices */}
+          {emptySlotCount > 0 && (
+            <div style={{
+              border: '3px solid var(--color-black)',
+              padding: 'var(--sp-2)',
+              marginTop: 'var(--sp-2)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 'var(--sp-2)',
+            }}>
+              <span className="text-tiny" style={{ textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {emptySlotCount} SLOT{emptySlotCount !== 1 ? 'S' : ''} EMPTY
+              </span>
+              <Button variant="secondary" size="sm" onClick={() => navigate('/capture')}>
+                CAPTURE REMAINING
+              </Button>
+            </div>
+          )}
+
+          {overflowPhotos.length > 0 && (
+            <div style={{
+              border: '3px solid var(--color-black)',
+              padding: 'var(--sp-2)',
+              marginTop: 'var(--sp-2)',
+            }}>
+              <span className="text-tiny" style={{ textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {overflowPhotos.length} EXTRA PHOTO{overflowPhotos.length !== 1 ? 'S' : ''} HIDDEN.
+                SWITCH TO A FRAME WITH MORE SLOTS TO RESTORE.
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Slot grid + controls */}

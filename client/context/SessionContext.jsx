@@ -9,6 +9,9 @@ const initialState = {
   // Photos mapped to slots
   photos: [], // [{ slotId, draftFile, imageUrl, transform, adjustments }]
 
+  // Photos that don't fit in the current frame (preserved across swaps)
+  overflowPhotos: [],
+
   // Camera
   cameraStatus: null, // { type, provider, model, message, warnings }
 
@@ -32,9 +35,34 @@ function reducer(state, action) {
         ...state,
         frame: action.payload,
         photos: [], // Reset photos when frame changes
+        overflowPhotos: [],
         resultUrl: null,
         resultFilename: null,
       };
+
+    case 'SWAP_FRAME': {
+      const newFrame = action.payload;
+      const oldSlots = state.frame?.slots || [];
+      const oldOrder = oldSlots.map((s) => s.id);
+      const placed = [...state.photos].sort(
+        (a, b) => oldOrder.indexOf(a.slotId) - oldOrder.indexOf(b.slotId)
+      );
+      const pool = [...placed, ...state.overflowPhotos];
+      const newPhotos = pool.slice(0, newFrame.slots.length).map((p, i) => ({
+        ...p,
+        slotId: newFrame.slots[i].id,
+        transform: { ...p.transform, x: 0, y: 0, scale: 1 },
+      }));
+      const overflowPhotos = pool.slice(newFrame.slots.length);
+      return {
+        ...state,
+        frame: newFrame,
+        photos: newPhotos,
+        overflowPhotos,
+        resultUrl: null,
+        resultFilename: null,
+      };
+    }
 
     case 'SET_PHOTO': {
       const { slotId, draftFile, imageUrl } = action.payload;
@@ -102,6 +130,7 @@ export function SessionProvider({ children }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
   const setFrame = useCallback((frame) => dispatch({ type: 'SET_FRAME', payload: frame }), []);
+  const swapFrame = useCallback((frame) => dispatch({ type: 'SWAP_FRAME', payload: frame }), []);
   const setPhoto = useCallback((payload) => dispatch({ type: 'SET_PHOTO', payload }), []);
   const updateTransform = useCallback((slotId, transform) =>
     dispatch({ type: 'UPDATE_TRANSFORM', payload: { slotId, transform } }), []);
@@ -118,6 +147,7 @@ export function SessionProvider({ children }) {
       ...state,
       dispatch,
       setFrame,
+      swapFrame,
       setPhoto,
       updateTransform,
       updateAdjustments,

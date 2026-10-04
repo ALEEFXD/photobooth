@@ -1,10 +1,10 @@
 /**
  * Config API routes.
  * GET   /api/config — read current config
- * PATCH /api/config — update config fields
+ * PATCH /api/config — update config fields (captureDelay validated against COUNTDOWN_OPTIONS)
  */
 import { Router } from 'express';
-import { readConfig, writeConfig } from '../utils.js';
+import { readConfig, writeConfig, COUNTDOWN_OPTIONS } from '../utils.js';
 
 const router = Router();
 
@@ -30,6 +30,13 @@ router.patch('/', (req, res) => {
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No valid config fields provided.' });
+    }
+
+    // Validate captureDelay
+    if (updates.captureDelay !== undefined && !COUNTDOWN_OPTIONS.includes(updates.captureDelay)) {
+      return res.status(400).json({
+        error: `captureDelay must be one of [${COUNTDOWN_OPTIONS.join(', ')}].`,
+      });
     }
 
     const config = writeConfig(updates);

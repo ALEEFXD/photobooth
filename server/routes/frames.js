@@ -1,13 +1,14 @@
 /**
  * Frame management API routes.
- * GET  /api/frames           — list all frames with metadata
- * POST /api/frames           — upload custom frame PNG
- * PUT  /api/frames/:id       — update frame metadata (slots, name)
- * GET  /api/frames/:id/image — serve frame PNG
+ * GET    /api/frames           — list all frames with metadata
+ * POST   /api/frames           — upload custom frame PNG
+ * PUT    /api/frames/:id       — update frame metadata (name, slots)
+ * DELETE /api/frames/:id       — delete a frame
+ * GET    /api/frames/:id/image — serve frame PNG
  */
 import { Router } from 'express';
 import multer from 'multer';
-import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { readdirSync, readFileSync, writeFileSync, existsSync, mkdirSync, rmSync } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { FRAMES_DIR } from '../utils.js';
@@ -23,6 +24,49 @@ const upload = multer({
     else cb(new Error('Only PNG files are allowed for frames.'));
   },
 });
+
+/**
+ * Validate that a frame ID is safe for path operations.
+ */
+function isSafeId(id) {
+  return typeof id === 'string' && /^[A-Za-z0-9_-]+$/.test(id);
+}
+
+/**
+ * Validate and sanitize slot definitions against frame dimensions.
+ * Returns sanitized slots or throws an error string.
+ */
+function validateSlots(slots, frameW, frameH) {
+  if (!Array.isArray(slots) || slots.length === 0) {
+    throw 'slots must be a non-empty array.';
+  }
+  const sanitized = slots.map((s, i) => {
+    const x = parseInt(s.x, 10);
+    const y = parseInt(s.y, 10);
+    const width = parseInt(s.width, 10);
+    const height = parseInt(s.height, 10);
+
+    if ([x, y, width, height].some((v) => !Number.isFinite(v))) {
+      throw `Slot ${i + 1}: x, y, width, height must be integers.`;
+    }
+    if (x < 0 || y < 0) {
+      throw `Slot ${i + 1}: x and y must be >= 0.`;
+    }
+    if (width < 1 || height < 1) {
+      throw `Slot ${i + 1}: width and height must be >= 1.`;
+    }
+    if (x + width > frameW) {
+      throw `Slot ${i + 1}: x + width (${x + width}) exceeds frame width (${frameW}).`;
+    }
+    if (y + height > frameH) {
+      throw `Slot ${i + 1}: y + height (${y + height}) exceeds frame height (${frameH}).`;
+    }
+
+    return { id: `slot-${i + 1}`, x, y, width, height };
+  });
+
+  return sanitized;
+}
 
 /**
  * Auto-detect transparent rectangular slots from a PNG's alpha channel.
@@ -123,7 +167,7 @@ router.post('/', upload.single('frame'), async (req, res) => {
       return res.status(400).json({ error: 'No PNG file uploaded.' });
     }
 
-    const name = req.body.name || 'Custom Frame';
+    const name = (req.body.name || 'Custom Frame').trim().substring(0, 40) || 'Custom Frame';
     const id = `custom-${Date.now()}`;
     const dir = path.join(FRAMES_DIR, id);
     mkdirSync(dir, { recursive: true });
@@ -134,7 +178,14 @@ router.post('/', upload.single('frame'), async (req, res) => {
     await sharp(req.file.buffer).png().toFile(framePath);
 
     // Auto-detect slots
-    const slots = await detectSlots(req.file.buffer);
+    let slots = await detectSlots(req.file.buffer);
+
+    // Validate detected slots against actual dimensions
+    try {
+      slots = validateSlots(slots, imgMeta.width, imgMeta.height);
+    } catch {
+      // If auto-detected slots somehow fail validation, keep them as-is
+    }
 
     const meta = {
       id,
@@ -145,6 +196,7 @@ router.post('/', upload.single('frame'), async (req, res) => {
       printHeight: '6in',
       slots,
       custom: true,
+      updatedAt: Date.now(),
     };
 
     writeFileSync(path.join(dir, 'meta.json'), JSON.stringify(meta, null, 2));
@@ -158,6 +210,9 @@ router.post('/', upload.single('frame'), async (req, res) => {
 router.put('/:id', (req, res) => {
   try {
     const { id } = req.params;
+    if (!isSafeId(id)) {
+      return res.status(400).json({ error: 'Invalid frame ID.' });
+    }
     const metaPath = path.join(FRAMES_DIR, id, 'meta.json');
     if (!existsSync(metaPath)) {
       return res.status(404).json({ error: `Frame "${id}" not found.` });
@@ -166,12 +221,27 @@ router.put('/:id', (req, res) => {
     const existing = JSON.parse(readFileSync(metaPath, 'utf-8'));
     const updates = req.body;
 
-    // Allow updating: name, slots, printWidth, printHeight
-    if (updates.name) existing.name = updates.name;
-    if (updates.slots) existing.slots = updates.slots;
+    // Whitelist fields: name, slots, printWidth, printHeight
+    if (updates.name !== undefined) {
+      const trimmed = String(updates.name).trim();
+      if (trimmed.length < 1 || trimmed.length > 40) {
+        return res.status(400).json({ error: 'Name must be 1-40 characters.' });
+      }
+      existing.name = trimmed;
+    }
+
+    if (updates.slots !== undefined) {
+      try {
+        existing.slots = validateSlots(updates.slots, existing.width, existing.height);
+      } catch (e) {
+        return res.status(400).json({ error: e });
+      }
+    }
+
     if (updates.printWidth) existing.printWidth = updates.printWidth;
     if (updates.printHeight) existing.printHeight = updates.printHeight;
 
+    existing.updatedAt = Date.now();
     writeFileSync(metaPath, JSON.stringify(existing, null, 2));
     res.json(existing);
   } catch (err) {
@@ -179,8 +249,33 @@ router.put('/:id', (req, res) => {
   }
 });
 
+router.delete('/:id', (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!isSafeId(id)) {
+      return res.status(400).json({ error: 'Invalid frame ID.' });
+    }
+    const dir = path.resolve(FRAMES_DIR, id);
+    // Ensure the resolved path is strictly inside FRAMES_DIR
+    if (!dir.startsWith(FRAMES_DIR + path.sep)) {
+      return res.status(400).json({ error: 'Invalid frame ID.' });
+    }
+    const metaPath = path.join(dir, 'meta.json');
+    if (!existsSync(metaPath)) {
+      return res.status(404).json({ error: `Frame "${id}" not found.` });
+    }
+    rmSync(dir, { recursive: true, force: true });
+    res.json({ success: true, id });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 router.get('/:id/image', (req, res) => {
   const { id } = req.params;
+  if (!isSafeId(id)) {
+    return res.status(400).json({ error: 'Invalid frame ID.' });
+  }
   const framePath = path.join(FRAMES_DIR, id, 'frame.png');
   if (!existsSync(framePath)) {
     return res.status(404).json({ error: `Frame image "${id}" not found.` });

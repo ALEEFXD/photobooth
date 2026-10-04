@@ -5,6 +5,7 @@ import { useCamera } from '../hooks/useCamera';
 import { useWebcam } from '../hooks/useWebcam';
 import { useCountdown } from '../hooks/useCountdown';
 import { compositeFrame } from '../canvas/compositor';
+import { usePhotoImages } from '../hooks/usePhotoImages';
 import Button from '../components/Button';
 import Countdown from '../components/Countdown';
 import StatusIndicator from '../components/StatusIndicator';
@@ -12,7 +13,7 @@ import Icon from '../components/Icon';
 
 export default function CapturePage() {
   const navigate = useNavigate();
-  const { frame, photos, setPhoto, captureDelay, captureMode } = useSession();
+  const { frame, photos, setPhoto, captureDelay, captureMode, setConfig } = useSession();
   const { cameraStatus, isWebcam, captureDSLR, saveWebcamCapture, switchCamera, availableProviders } = useCamera();
   const { videoRef, stream, error: webcamError, start: startWebcam, stop: stopWebcam, capture: captureFrame } = useWebcam();
   const { seconds, isRunning, start: startCountdown, stop: stopCountdown } = useCountdown(captureDelay);
@@ -23,12 +24,44 @@ export default function CapturePage() {
   const [captureError, setCaptureError] = useState(null);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isSwitching, setIsSwitching] = useState(false);
-  const [photoImages, setPhotoImages] = useState({});
+  const photoImages = usePhotoImages(photos);
+
+  const COUNTDOWN_OPTIONS = [10, 5, 3, 0];
+
+  // Displayed countdown selection (handles legacy 'manual' mode)
+  const activeCountdown = captureMode === 'manual' ? 0 : captureDelay;
+
+  const handleCountdownChange = useCallback(async (value) => {
+    const prevDelay = captureDelay;
+    const prevMode = captureMode;
+    setConfig({ captureDelay: value, captureMode: 'timer' });
+    try {
+      const res = await fetch('/api/config', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ captureDelay: value, captureMode: 'timer' }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || 'Failed to save setting.');
+      }
+    } catch (err) {
+      setCaptureError(err.message);
+      setConfig({ captureDelay: prevDelay, captureMode: prevMode });
+    }
+  }, [captureDelay, captureMode, setConfig]);
 
   // Current slot to fill
   const filledSlotIds = photos.map((p) => p.slotId);
   const nextSlot = frame?.slots.find((s) => !filledSlotIds.includes(s.id));
   const allFilled = frame && filledSlotIds.length >= frame.slots.length;
+
+  // Slot that determines the viewfinder ratio
+  const lastFilledSlot = photos.length > 0
+    ? frame?.slots.find((s) => s.id === photos[photos.length - 1].slotId)
+    : null;
+  const viewfinderSlot = nextSlot || lastFilledSlot || frame?.slots[0];
+  const vfRatio = viewfinderSlot ? viewfinderSlot.width / viewfinderSlot.height : 4 / 3;
 
   // Load frame image
   useEffect(() => {
@@ -84,26 +117,13 @@ export default function CapturePage() {
 
     const photoList = photos.map((p) => ({
       slotId: p.slotId,
-      image: photoImages[p.slotId] || null,
+      image: photoImages[p.imageUrl] || null,
       transform: p.transform,
       adjustments: p.adjustments,
     }));
 
     compositeFrame(canvasRef.current, frameImgRef.current, frame.slots, photoList);
   }, [frameLoaded, photos, photoImages, frame]);
-
-  // Load photo images for preview
-  useEffect(() => {
-    for (const photo of photos) {
-      if (!photoImages[photo.slotId] && photo.imageUrl) {
-        const img = new Image();
-        img.onload = () => {
-          setPhotoImages((prev) => ({ ...prev, [photo.slotId]: img }));
-        };
-        img.src = photo.imageUrl;
-      }
-    }
-  }, [photos]);
 
   // Redirect to adjust when all filled
   useEffect(() => {
@@ -186,12 +206,13 @@ export default function CapturePage() {
       }}>
         {/* Live camera feed */}
         <div style={{
-          flex: '1 1 400px',
+          flex: '0 1 auto',
+          width: `min(100%, calc(65vh * ${vfRatio}))`,
           maxWidth: '640px',
           border: '5px solid var(--color-black)',
           position: 'relative',
           background: '#000',
-          aspectRatio: '4/3',
+          aspectRatio: viewfinderSlot ? `${viewfinderSlot.width} / ${viewfinderSlot.height}` : '4 / 3',
         }}>
           {isWebcam && (
             <video
@@ -268,6 +289,26 @@ export default function CapturePage() {
             />
           </div>
 
+          {/* Countdown selector */}
+          {!allFilled && (
+            <div style={{ width: '100%' }}>
+              <p className="input-label" style={{ marginBottom: 'var(--sp-1)' }}>COUNTDOWN</p>
+              <div style={{ display: 'flex', gap: 'var(--sp-1)' }}>
+                {COUNTDOWN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    className={`chip chip--filter${activeCountdown === opt ? ' active' : ''}`}
+                    onClick={() => handleCountdownChange(opt)}
+                    disabled={isCapturing || isRunning}
+                    style={{ flex: 1 }}
+                  >
+                    {opt === 0 ? 'OFF' : `${opt}S`}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Capture controls */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--sp-2)', width: '100%' }}>
             {!allFilled && (
@@ -279,7 +320,7 @@ export default function CapturePage() {
                 disabled={isCapturing || isRunning || !nextSlot}
                 style={{ width: '100%' }}
               >
-                {isRunning ? `WAIT ${seconds}s` : captureMode === 'manual' ? 'CAPTURE' : `CAPTURE (${captureDelay}s)`}
+                {isRunning ? `WAIT ${seconds}s` : activeCountdown === 0 ? 'CAPTURE' : `CAPTURE (${captureDelay}s)`}
               </Button>
             )}
 

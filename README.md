@@ -47,8 +47,8 @@ Vite proxies `/api`, `/output`, and `/frames` to Express.
 
 1. **Home** → press **START SESSION** (film icon)
 2. **Frame Select** → choose a built-in frame or import a custom PNG
-3. **Capture** → photos are taken with an 8-second countdown (configurable) until every slot is filled
-4. **Adjust** → view drafts, retake any slot, crop/pan/zoom, adjust brightness/contrast/grayscale, rotate, flip, or swap the frame
+3. **Capture** → choose a countdown (10 / 5 / 3 / off) on the capture screen, then fill each slot
+4. **Adjust** → view drafts, retake any slot, crop/pan/zoom, adjust brightness/contrast/grayscale, rotate, flip, or swap the frame (photos are kept and remapped — extra photos are held until a larger frame is chosen)
 5. **Result** → print via the browser print dialog (4×6 inch page) or save as JPEG to the active folder
 
 ## Folder Management
@@ -61,6 +61,8 @@ Vite proxies `/api`, `/output`, and `/frames` to Express.
 
 - Import any PNG with transparent rectangular regions (the app auto-detects photo slots from alpha transparency)
 - Manually add, remove, or resize slots in the import dialog
+- Edit existing frames (name, slot positions) from the frame selection screen
+- Delete frames from the frame selection screen (built-in frames are restored on the next `npm install`)
 - Custom frames are saved to `./frames/` alongside the built-in ones
 
 ## Project Structure
@@ -94,7 +96,7 @@ photobooth/
 │   ├── components/        # Button, Modal, Icon, Countdown, StatusIndicator
 │   ├── pages/             # HomePage, FrameSelectPage, CapturePage, AdjustPage, ResultPage
 │   ├── canvas/            # compositor.js, slotDetector.js
-│   ├── hooks/             # useCamera, useCountdown, useWebcam
+│   ├── hooks/             # useCamera, useCountdown, usePhotoImages, useWebcam
 │   └── context/           # SessionContext
 ├── frames/                # built-in + custom frame PNGs + meta.json
 ├── output/                # captured photos + composed results
@@ -110,13 +112,14 @@ photobooth/
 | `POST` | `/api/camera/capture` | Trigger DSLR capture |
 | `POST` | `/api/camera/refresh` | Force camera re-detection |
 | `GET` | `/api/config` | Read config |
-| `PATCH` | `/api/config` | Update config |
+| `PATCH` | `/api/config` | Update config (`captureDelay` validated: must be 10, 5, 3, or 0) |
 | `GET` | `/api/folders` | List folders |
 | `POST` | `/api/folders` | Create folder |
 | `PATCH` | `/api/folders/active` | Set active folder |
 | `GET` | `/api/frames` | List frames |
 | `POST` | `/api/frames` | Upload custom frame |
-| `PUT` | `/api/frames/:id` | Update frame metadata |
+| `PUT` | `/api/frames/:id` | Update frame metadata (name 1-40 chars, slots validated against frame dims) |
+| `DELETE` | `/api/frames/:id` | Delete a frame (path-traversal protected) |
 | `GET` | `/api/frames/:id/image` | Serve frame PNG |
 | `GET` | `/api/drafts` | List drafts |
 | `POST` | `/api/drafts` | Save draft (base64 or multipart) |

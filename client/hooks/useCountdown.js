@@ -22,10 +22,10 @@ export function useCountdown(initialSeconds = 8) {
   const start = useCallback((duration, onComplete) => {
     stop();
     onCompleteRef.current = onComplete;
-    setSeconds(duration || initialSeconds);
+    setSeconds(duration ?? initialSeconds);
     setIsRunning(true);
 
-    let remaining = duration || initialSeconds;
+    let remaining = duration ?? initialSeconds;
 
     intervalRef.current = setInterval(() => {
       remaining--;

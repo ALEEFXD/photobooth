@@ -9,14 +9,16 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, '..');
 export const CONFIG_PATH = path.join(ROOT, 'config.json');
 export const FRAMES_DIR = path.join(ROOT, 'frames');
+export const COUNTDOWN_OPTIONS = [10, 5, 3, 0];
 
 /**
  * Read config.json, creating defaults if missing.
+ * Normalizes captureDelay to the nearest allowed option.
  */
 export function readConfig() {
   const defaults = {
     activeFolder: 'default',
-    captureDelay: 8,
+    captureDelay: 10,
     captureMode: 'timer',
     outputRoot: './output',
   };
@@ -25,7 +27,14 @@ export function readConfig() {
     return defaults;
   }
   try {
-    return { ...defaults, ...JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) };
+    const raw = { ...defaults, ...JSON.parse(readFileSync(CONFIG_PATH, 'utf-8')) };
+    // Normalize captureDelay to nearest allowed option
+    if (!COUNTDOWN_OPTIONS.includes(raw.captureDelay)) {
+      raw.captureDelay = COUNTDOWN_OPTIONS.reduce((best, opt) =>
+        Math.abs(opt - raw.captureDelay) < Math.abs(best - raw.captureDelay) ? opt : best
+      );
+    }
+    return raw;
   } catch {
     return defaults;
   }
